@@ -16,12 +16,15 @@
  */
 package org.camunda.bpm.engine.test.api.repository;
 
+import static org.hamcrest.CoreMatchers.hasItems;
+import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.junit.Assume.assumeThat;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,15 +32,19 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
+import org.camunda.bpm.application.ProcessApplicationReference;
 import org.camunda.bpm.application.ProcessApplicationRegistration;
 import org.camunda.bpm.application.impl.EmbeddedProcessApplication;
+import org.camunda.bpm.engine.ProcessEngine;
 import org.camunda.bpm.engine.RepositoryService;
 import org.camunda.bpm.engine.exception.NotFoundException;
 import org.camunda.bpm.engine.exception.NotValidException;
+import org.camunda.bpm.engine.impl.cfg.ProcessEngineConfigurationImpl;
 import org.camunda.bpm.engine.query.Query;
 import org.camunda.bpm.engine.repository.Deployment;
 import org.camunda.bpm.engine.repository.DeploymentQuery;
 import org.camunda.bpm.engine.repository.ProcessApplicationDeployment;
+import org.camunda.bpm.engine.repository.ProcessDefinition;
 import org.camunda.bpm.engine.repository.ProcessDefinitionQuery;
 import org.camunda.bpm.engine.repository.Resource;
 import org.camunda.bpm.engine.repository.ResumePreviousBy;
@@ -46,6 +53,7 @@ import org.camunda.bpm.engine.test.util.ProcessEngineTestRule;
 import org.camunda.bpm.engine.test.util.ProvidedProcessEngineRule;
 import org.camunda.bpm.model.bpmn.Bpmn;
 import org.camunda.bpm.model.bpmn.BpmnModelInstance;
+import org.camunda.bpm.model.bpmn.instance.UserTask;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -1481,6 +1489,64 @@ public class RedeploymentTest {
     ProcessApplicationRegistration registration = deployment3.getProcessApplicationRegistration();
     Set<String> deploymentIds = registration.getDeploymentIds();
     assertEquals(3, deploymentIds.size());
+  }
+
+  @Test
+  public void shouldRegisterExistingDeploymentsOnRestart() {
+    // given
+    ProcessEngine processEngine = engineRule.getProcessEngine();
+    EmbeddedProcessApplication processApplication = new EmbeddedProcessApplication();
+    ProcessDefinitionQuery query = repositoryService.createProcessDefinitionQuery();
+    // a process instance
+    BpmnModelInstance modelInstance = Bpmn.createExecutableProcess("test")
+        .startEvent()
+        .userTask("userTask")
+        .endEvent()
+        .done();
+
+    // first process application deployment
+    ProcessApplicationDeployment deployment1 = testRule.deploy(
+        repositoryService
+            .createDeployment(processApplication.getReference())
+            .name("existingDeploymentRegistration")
+            .addModelInstance("process.bpmn20.xml", modelInstance));
+    assumeThat(query.singleResult().getVersion(), is(1));
+
+    // modify process
+    UserTask userTask = modelInstance.getModelElementById("userTask");
+    userTask.setCamundaAssignee("kermit");
+
+    // second process application deployment
+    ProcessApplicationDeployment deployment2 = testRule.deploy(
+        repositoryService
+            .createDeployment(processApplication.getReference())
+            .name("existingDeploymentRegistration")
+            .enableDuplicateFiltering(true)
+            .resumePreviousVersions()
+            .addModelInstance("process.bpmn20.xml", modelInstance));
+    ProcessDefinition latestProcessDefinition = query.latestVersion().singleResult();
+    assumeThat(latestProcessDefinition.getVersion(), is(2));
+    assumeThat(deployment2.getProcessApplicationRegistration().getDeploymentIds(),
+               hasItems(deployment1.getId(), deployment2.getId()));
+
+    // remove latest version
+    repositoryService.deleteProcessDefinition(latestProcessDefinition.getId());
+
+    // when
+    // the server is restarted
+    processEngine.close();
+    processEngine = engineRule.getProcessEngineConfiguration().buildProcessEngine();
+    processApplication.deploy();
+
+    // then
+    ProcessApplicationReference paRef = ((ProcessEngineConfigurationImpl)processEngine.getProcessEngineConfiguration())
+        .getProcessApplicationManager()
+        .getProcessApplicationForDeployment(deployment1.getId());
+    assertNotNull(paRef);
+
+
+    Deployment one = repositoryService.createDeploymentQuery().deploymentId(deployment1.getId()).singleResult();
+//    assertEquals(2, one.getProcessApplicationRegistration().getDeploymentIds().size());
   }
 
   // helper ///////////////////////////////////////////////////////////
