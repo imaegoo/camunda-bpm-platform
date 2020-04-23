@@ -156,7 +156,7 @@ public class SetJobRetriesAuthorizationTest {
     // then
     if (authRule.assertScenario(scenario)) {
       Job job = selectJobById(jobId);
-      assertThat(job).isNull();
+      assertThat(job).isNotNull();
       assertThat(job.getRetries()).isEqualTo(1);
     }
 
@@ -185,7 +185,7 @@ public class SetJobRetriesAuthorizationTest {
     // then
     if (authRule.assertScenario(scenario)) {
       Job job = selectJobById(jobId);
-      assertThat(job).isNull();
+      assertThat(job).isNotNull();
       assertThat(job.getRetries()).isEqualTo(1);
     }
   }
