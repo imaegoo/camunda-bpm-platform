@@ -16,18 +16,18 @@
  */
 package org.camunda.bpm.engine.test.api.authorization.job;
 
+import static org.camunda.bpm.engine.authorization.Permissions.UPDATE;
+import static org.camunda.bpm.engine.authorization.Permissions.UPDATE_INSTANCE;
+import static org.camunda.bpm.engine.authorization.Resources.PROCESS_DEFINITION;
+import static org.camunda.bpm.engine.authorization.Resources.PROCESS_INSTANCE;
 import static org.camunda.bpm.engine.test.api.authorization.util.AuthorizationScenario.scenario;
 import static org.camunda.bpm.engine.test.api.authorization.util.AuthorizationSpec.grant;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Collection;
 
 import org.camunda.bpm.engine.ManagementService;
-import org.camunda.bpm.engine.authorization.Permissions;
-import org.camunda.bpm.engine.authorization.Resources;
+import org.camunda.bpm.engine.RuntimeService;
 import org.camunda.bpm.engine.management.JobDefinition;
 import org.camunda.bpm.engine.runtime.Job;
 import org.camunda.bpm.engine.runtime.ProcessInstance;
@@ -58,6 +58,7 @@ public class UpdateJobAuthorizationTest {
   public RuleChain chain = RuleChain.outerRule(engineRule).around(authRule);
 
   ManagementService managementService;
+  RuntimeService runtimeService;
 
   @Parameter
   public AuthorizationScenario scenario;
@@ -68,22 +69,22 @@ public class UpdateJobAuthorizationTest {
       scenario()
         .withoutAuthorizations()
         .failsDueToRequired(
-            grant(Resources.PROCESS_INSTANCE, "processInstanceId", "userId", Permissions.UPDATE),
-            grant(Resources.PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", Permissions.UPDATE_INSTANCE)),
+            grant(PROCESS_INSTANCE, "processInstanceId", "userId", UPDATE),
+            grant(PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", UPDATE_INSTANCE)),
       scenario()
         .withAuthorizations(
-            grant(Resources.PROCESS_INSTANCE, "processInstanceId", "userId", Permissions.UPDATE))
+            grant(PROCESS_INSTANCE, "processInstanceId", "userId", UPDATE))
         .succeeds(),
       scenario()
         .withAuthorizations(
-            grant(Resources.PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", Permissions.UPDATE_INSTANCE))
+            grant(PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", UPDATE_INSTANCE))
         .succeeds(),
         scenario()
         .withAuthorizations(
-            grant(Resources.PROCESS_INSTANCE, "someProcessInstanceId", "userId", Permissions.UPDATE))
+            grant(PROCESS_INSTANCE, "someProcessInstanceId", "userId", UPDATE))
         .failsDueToRequired(
-            grant(Resources.PROCESS_INSTANCE, "processInstanceId", "userId", Permissions.UPDATE),
-            grant(Resources.PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", Permissions.UPDATE_INSTANCE))
+            grant(PROCESS_INSTANCE, "processInstanceId", "userId", UPDATE),
+            grant(PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", UPDATE_INSTANCE))
         .succeeds()
       );
   }
@@ -93,6 +94,7 @@ public class UpdateJobAuthorizationTest {
   @Before
   public void setUp() throws Exception {
     managementService = engineRule.getManagementService();
+    runtimeService = engineRule.getRuntimeService();
     authRule.createUserAndGroup("userId", "groupId");
   }
 
@@ -102,10 +104,13 @@ public class UpdateJobAuthorizationTest {
   }
 
   @Test
-  @Deployment(resources = { "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
-  public void testExecuteJob() {
+  @Deployment(resources = {
+      "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
+  public void shouldExecuteJob() {
     // given
-    String processInstanceId = engineRule.getRuntimeService().startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY).getId();
+    String processInstanceId = runtimeService
+        .startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY)
+        .getId();
     String jobId = selectJobByProcessInstanceId(processInstanceId).getId();
 
     // when
@@ -119,15 +124,22 @@ public class UpdateJobAuthorizationTest {
 
     // then
     if (authRule.assertScenario(scenario)) {
-      assertEquals("taskAfterBoundaryEvent", engineRule.getTaskService().createTaskQuery().singleResult().getTaskDefinitionKey());
+      String taskDefinitionKey = engineRule.getTaskService()
+          .createTaskQuery()
+          .singleResult()
+          .getTaskDefinitionKey();
+      assertThat(taskDefinitionKey).isEqualTo("taskAfterBoundaryEvent");
     }
   }
 
   @Test
-  @Deployment(resources = { "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
-  public void testSuspendJobById() {
+  @Deployment(resources = {
+      "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
+  public void shouldSuspendJobById() {
     // given
-    String processInstanceId = engineRule.getRuntimeService().startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY).getId();
+    String processInstanceId = runtimeService
+        .startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY)
+        .getId();
     String jobId = selectJobByProcessInstanceId(processInstanceId).getId();
 
     // when
@@ -143,15 +155,18 @@ public class UpdateJobAuthorizationTest {
     // then
     if (authRule.assertScenario(scenario)) {
       Job job = selectJobById(jobId);
-      assertTrue(job.isSuspended());
+      assertThat(job.isSuspended()).isTrue();
     }
   }
 
   @Test
-  @Deployment(resources = { "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
-  public void testActivateJobById() {
+  @Deployment(resources = {
+      "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
+  public void shouldActivateJobById() {
     // given
-    String processInstanceId = engineRule.getRuntimeService().startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY).getId();
+    String processInstanceId = runtimeService
+        .startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY)
+        .getId();
     String jobId = selectJobByProcessInstanceId(processInstanceId).getId();
 
     // when
@@ -167,15 +182,18 @@ public class UpdateJobAuthorizationTest {
     // then
     if (authRule.assertScenario(scenario)) {
       Job job = selectJobById(jobId);
-      assertFalse(job.isSuspended());
+      assertThat(job.isSuspended()).isFalse();
     }
   }
 
   @Test
-  @Deployment(resources = { "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
-  public void testSuspendJobByProcessInstanceId() {
+  @Deployment(resources = {
+      "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
+  public void shouldSuspendJobByProcessInstanceId() {
     // given
-    String processInstanceId = engineRule.getRuntimeService().startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY).getId();
+    String processInstanceId = runtimeService
+        .startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY)
+        .getId();
     String jobId = selectJobByProcessInstanceId(processInstanceId).getId();
 
     // when
@@ -191,15 +209,18 @@ public class UpdateJobAuthorizationTest {
     // then
     if (authRule.assertScenario(scenario)) {
       Job job = selectJobById(jobId);
-      assertTrue(job.isSuspended());
+      assertThat(job.isSuspended()).isTrue();
     }
   }
 
   @Test
-  @Deployment(resources = { "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
-  public void testActivateJobByProcessInstanceId() {
+  @Deployment(resources = {
+      "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
+  public void shouldActivateJobByProcessInstanceId() {
     // given
-    String processInstanceId = engineRule.getRuntimeService().startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY).getId();
+    String processInstanceId = runtimeService
+        .startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY)
+        .getId();
     String jobId = selectJobByProcessInstanceId(processInstanceId).getId();
 
     // when
@@ -215,16 +236,20 @@ public class UpdateJobAuthorizationTest {
     // then
     if (authRule.assertScenario(scenario)) {
       Job job = selectJobById(jobId);
-      assertFalse(job.isSuspended());
+      assertThat(job.isSuspended()).isFalse();
     }
   }
 
   @Test
-  @Deployment(resources = { "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
-  public void testSuspendJobByJobDefinitionId() {
+  @Deployment(resources = {
+      "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
+  public void shouldSuspendJobByJobDefinitionId() {
     // given
-    String processInstanceId = engineRule.getRuntimeService().startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY).getId();
-    String jobDefinitionId = selectJobDefinitionByProcessDefinitionKey(TIMER_BOUNDARY_PROCESS_KEY).getId();
+    String processInstanceId = runtimeService
+        .startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY)
+        .getId();
+    String jobDefinitionId = selectJobDefinitionIdByProcessDefinitionKey(
+        TIMER_BOUNDARY_PROCESS_KEY);
 
     // when
     authRule
@@ -239,16 +264,20 @@ public class UpdateJobAuthorizationTest {
     // then
     if (authRule.assertScenario(scenario)) {
       Job job = selectJobByProcessInstanceId(processInstanceId);
-      assertTrue(job.isSuspended());
+      assertThat(job.isSuspended()).isTrue();
     }
   }
 
   @Test
-  @Deployment(resources = { "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
-  public void testActivateJobByJobDefinitionId() {
+  @Deployment(resources = {
+      "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
+  public void shouldActivateJobByJobDefinitionId() {
     // given
-    String processInstanceId = engineRule.getRuntimeService().startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY).getId();
-    String jobDefinitionId = selectJobDefinitionByProcessDefinitionKey(TIMER_BOUNDARY_PROCESS_KEY).getId();
+    String processInstanceId = runtimeService
+        .startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY)
+        .getId();
+    String jobDefinitionId = selectJobDefinitionIdByProcessDefinitionKey(
+        TIMER_BOUNDARY_PROCESS_KEY);
 
     // when
     authRule
@@ -263,15 +292,17 @@ public class UpdateJobAuthorizationTest {
     // then
     if (authRule.assertScenario(scenario)) {
       Job job = selectJobByProcessInstanceId(processInstanceId);
-      assertFalse(job.isSuspended());
+      assertThat(job.isSuspended()).isFalse();
     }
   }
 
   @Test
-  @Deployment(resources = { "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
-  public void testSuspendJobByProcessDefinitionId() {
+  @Deployment(resources = {
+      "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
+  public void shouldSuspendJobByProcessDefinitionId() {
     // given
-    ProcessInstance processInstance = engineRule.getRuntimeService().startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY);
+    ProcessInstance processInstance = runtimeService
+        .startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY);
 
     // when
     authRule
@@ -286,16 +317,18 @@ public class UpdateJobAuthorizationTest {
     // then
     if (authRule.assertScenario(scenario)) {
       Job job = selectJobByProcessInstanceId(processInstance.getId());
-      assertTrue(job.isSuspended());
+      assertThat(job.isSuspended()).isTrue();
     }
   }
 
 
   @Test
-  @Deployment(resources = { "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
-  public void testActivateJobByProcessDefinitionId() {
+  @Deployment(resources = {
+      "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
+  public void shouldActivateJobByProcessDefinitionId() {
     // given
-    ProcessInstance processInstance = engineRule.getRuntimeService().startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY);
+    ProcessInstance processInstance = runtimeService
+        .startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY);
 
     // when
     authRule
@@ -310,15 +343,18 @@ public class UpdateJobAuthorizationTest {
     // then
     if (authRule.assertScenario(scenario)) {
       Job job = selectJobByProcessInstanceId(processInstance.getId());
-      assertFalse(job.isSuspended());
+      assertThat(job.isSuspended()).isFalse();
     }
   }
 
   @Test
-  @Deployment(resources = { "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
-  public void testSuspendJobByProcessDefinitionKey() {
+  @Deployment(resources = {
+      "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
+  public void shouldSuspendJobByProcessDefinitionKey() {
     // given
-    String processInstanceId = engineRule.getRuntimeService().startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY).getId();
+    String processInstanceId = runtimeService
+        .startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY)
+        .getId();
 
     // when
     authRule
@@ -333,15 +369,18 @@ public class UpdateJobAuthorizationTest {
     // then
     if (authRule.assertScenario(scenario)) {
       Job job = selectJobByProcessInstanceId(processInstanceId);
-      assertTrue(job.isSuspended());
+      assertThat(job.isSuspended()).isTrue();
     }
   }
 
   @Test
-  @Deployment(resources = { "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
-  public void testActivateJobByProcessDefinitionKey() {
+  @Deployment(resources = {
+      "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
+  public void shouldActivateJobByProcessDefinitionKey() {
     // given
-    String processInstanceId = engineRule.getRuntimeService().startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY).getId();
+    String processInstanceId = runtimeService
+        .startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY)
+        .getId();
 
     // when
     authRule
@@ -356,15 +395,18 @@ public class UpdateJobAuthorizationTest {
     // then
     if (authRule.assertScenario(scenario)) {
       Job job = selectJobByProcessInstanceId(processInstanceId);
-      assertFalse(job.isSuspended());
+      assertThat(job.isSuspended()).isFalse();
     }
   }
 
   @Test
-  @Deployment(resources = { "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
-  public void testSetJobDueDate() {
+  @Deployment(resources = {
+      "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
+  public void shouldSetJobDueDate() {
     // given
-    String processInstanceId = engineRule.getRuntimeService().startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY).getId();
+    String processInstanceId = runtimeService
+        .startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY)
+        .getId();
     String jobId = selectJobByProcessInstanceId(processInstanceId).getId();
 
     // when
@@ -380,15 +422,18 @@ public class UpdateJobAuthorizationTest {
     // then
     if (authRule.assertScenario(scenario)) {
       Job job = selectJobById(jobId);
-      assertNull(job.getDuedate());
+      assertThat(job.getDuedate()).isNull();
     }
   }
 
   @Test
-  @Deployment(resources = { "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
-  public void testDeleteJob() {
+  @Deployment(resources = {
+      "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
+  public void shouldDeleteJob() {
     // given
-    String processInstanceId = engineRule.getRuntimeService().startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY).getId();
+    String processInstanceId = runtimeService
+        .startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY)
+        .getId();
     String jobId = selectJobByProcessInstanceId(processInstanceId).getId();
 
     // when
@@ -404,7 +449,7 @@ public class UpdateJobAuthorizationTest {
     // then
     if (authRule.assertScenario(scenario)) {
       Job job = selectJobByProcessInstanceId(processInstanceId);
-      assertNull(job);
+      assertThat(job).isNull();
     }
   }
 
@@ -426,12 +471,12 @@ public class UpdateJobAuthorizationTest {
     return job;
   }
 
-  protected JobDefinition selectJobDefinitionByProcessDefinitionKey(String processDefinitionKey) {
+  protected String selectJobDefinitionIdByProcessDefinitionKey(String processDefinitionKey) {
     JobDefinition jobDefinition = managementService
         .createJobDefinitionQuery()
         .processDefinitionKey(processDefinitionKey)
         .singleResult();
-    return jobDefinition;
+    return jobDefinition.getId();
   }
 
 }

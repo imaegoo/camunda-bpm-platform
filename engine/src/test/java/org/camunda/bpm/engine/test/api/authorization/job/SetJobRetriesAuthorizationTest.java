@@ -16,19 +16,20 @@
  */
 package org.camunda.bpm.engine.test.api.authorization.job;
 
+import static org.camunda.bpm.engine.authorization.Permissions.UPDATE;
+import static org.camunda.bpm.engine.authorization.Permissions.UPDATE_INSTANCE;
 import static org.camunda.bpm.engine.authorization.Resources.PROCESS_DEFINITION;
+import static org.camunda.bpm.engine.authorization.Resources.PROCESS_INSTANCE;
 import static org.camunda.bpm.engine.test.api.authorization.util.AuthorizationScenario.scenario;
-import static org.camunda.bpm.engine.test.api.authorization.util.AuthorizationSpec.*;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.camunda.bpm.engine.test.api.authorization.util.AuthorizationSpec.grant;
+import static org.camunda.bpm.engine.test.api.authorization.util.AuthorizationSpec.revoke;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Collection;
 
 import org.camunda.bpm.engine.ManagementService;
-import org.camunda.bpm.engine.authorization.Permissions;
 import org.camunda.bpm.engine.authorization.ProcessDefinitionPermissions;
 import org.camunda.bpm.engine.authorization.ProcessInstancePermissions;
-import org.camunda.bpm.engine.authorization.Resources;
 import org.camunda.bpm.engine.management.JobDefinition;
 import org.camunda.bpm.engine.runtime.Job;
 import org.camunda.bpm.engine.test.Deployment;
@@ -68,50 +69,50 @@ public class SetJobRetriesAuthorizationTest {
       scenario()
         .withoutAuthorizations()
         .failsDueToRequired(
-            grant(Resources.PROCESS_INSTANCE, "anyProcessInstanceId", "userId", ProcessInstancePermissions.RETRY_JOB),
-            grant(Resources.PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", ProcessDefinitionPermissions.RETRY_JOB),
-            grant(Resources.PROCESS_INSTANCE, "anyProcessInstanceId", "userId", Permissions.UPDATE),
-            grant(Resources.PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", Permissions.UPDATE_INSTANCE)),
+            grant(PROCESS_INSTANCE, "anyProcessInstanceId", "userId", ProcessInstancePermissions.RETRY_JOB),
+            grant(PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", ProcessDefinitionPermissions.RETRY_JOB),
+            grant(PROCESS_INSTANCE, "anyProcessInstanceId", "userId", UPDATE),
+            grant(PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", UPDATE_INSTANCE)),
       scenario()
       .withAuthorizations(
-          grant(Resources.PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", Permissions.UPDATE),
-          revoke(PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", ProcessDefinitionPermissions.RETRY_JOB))
+            grant(PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", UPDATE),
+            revoke(PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", ProcessDefinitionPermissions.RETRY_JOB))
+      .failsDueToRequired(
+            grant(PROCESS_INSTANCE, "anyProcessInstanceId", "userId", ProcessInstancePermissions.RETRY_JOB),
+            grant(PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", ProcessDefinitionPermissions.RETRY_JOB),
+            grant(PROCESS_INSTANCE, "anyProcessInstanceId", "userId", UPDATE),
+            grant(PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", UPDATE_INSTANCE)),
+      scenario()
+        .withAuthorizations(
+            grant(PROCESS_INSTANCE, "specProcessInstanceId", "userId", UPDATE, ProcessInstancePermissions.RETRY_JOB))
         .failsDueToRequired(
-            grant(Resources.PROCESS_INSTANCE, "anyProcessInstanceId", "userId", ProcessInstancePermissions.RETRY_JOB),
-            grant(Resources.PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", ProcessDefinitionPermissions.RETRY_JOB),
-            grant(Resources.PROCESS_INSTANCE, "anyProcessInstanceId", "userId", Permissions.UPDATE),
-            grant(Resources.PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", Permissions.UPDATE_INSTANCE)),
+            grant(PROCESS_INSTANCE, "anyProcessInstanceId", "userId", ProcessInstancePermissions.RETRY_JOB),
+            grant(PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", ProcessDefinitionPermissions.RETRY_JOB),
+            grant(PROCESS_INSTANCE, "anyProcessInstanceId", "userId", UPDATE),
+            grant(PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", UPDATE_INSTANCE)),
       scenario()
         .withAuthorizations(
-            grant(Resources.PROCESS_INSTANCE, "specProcessInstanceId", "userId", Permissions.UPDATE, ProcessInstancePermissions.RETRY_JOB))
-        .failsDueToRequired(
-            grant(Resources.PROCESS_INSTANCE, "anyProcessInstanceId", "userId", ProcessInstancePermissions.RETRY_JOB),
-            grant(Resources.PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", ProcessDefinitionPermissions.RETRY_JOB),
-            grant(Resources.PROCESS_INSTANCE, "anyProcessInstanceId", "userId", Permissions.UPDATE),
-            grant(Resources.PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", Permissions.UPDATE_INSTANCE)),
-      scenario()
-        .withAuthorizations(
-            grant(Resources.PROCESS_INSTANCE, "anyProcessInstanceId", "userId", ProcessInstancePermissions.RETRY_JOB))
+            grant(PROCESS_INSTANCE, "anyProcessInstanceId", "userId", ProcessInstancePermissions.RETRY_JOB))
         .succeeds(),
       scenario()
         .withAuthorizations(
-            grant(Resources.PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", ProcessDefinitionPermissions.RETRY_JOB))
+            grant(PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", ProcessDefinitionPermissions.RETRY_JOB))
         .succeeds(),
       scenario()
         .withAuthorizations(
-            grant(Resources.PROCESS_INSTANCE, "anyProcessInstanceId", "userId", Permissions.UPDATE))
+            grant(PROCESS_INSTANCE, "anyProcessInstanceId", "userId", UPDATE))
         .succeeds(),
       scenario()
         .withAuthorizations(
-            grant(Resources.PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", Permissions.UPDATE_INSTANCE))
+            grant(PROCESS_DEFINITION, TIMER_BOUNDARY_PROCESS_KEY, "userId", UPDATE_INSTANCE))
         .succeeds(),
       scenario()
         .withAuthorizations(
-            grant(Resources.PROCESS_DEFINITION, "*", "userId", Permissions.UPDATE_INSTANCE))
+            grant(PROCESS_DEFINITION, "*", "userId", UPDATE_INSTANCE))
         .succeeds(),
       scenario()
         .withAuthorizations(
-            grant(Resources.PROCESS_DEFINITION, "*", "userId", ProcessDefinitionPermissions.RETRY_JOB))
+            grant(PROCESS_DEFINITION, "*", "userId", ProcessDefinitionPermissions.RETRY_JOB))
         .succeeds()
       );
   }
@@ -130,11 +131,15 @@ public class SetJobRetriesAuthorizationTest {
   }
 
   @Test
-  @Deployment(resources = { "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
-  public void testSetJobRetriesByJobDefinitionId() {
-   // given
-    String processInstanceId = engineRule.getRuntimeService().startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY).getId();
-    JobDefinition jobDefinition = selectJobDefinitionByProcessDefinitionKey(TIMER_BOUNDARY_PROCESS_KEY);
+  @Deployment(resources = {
+      "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
+  public void shouldSetJobRetriesByJobDefinitionId() {
+    // given
+    String processInstanceId = engineRule.getRuntimeService()
+        .startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY)
+        .getId();
+    JobDefinition jobDefinition = selectJobDefinitionByProcessDefinitionKey(
+        TIMER_BOUNDARY_PROCESS_KEY);
     String jobId = selectJobByProcessInstanceId(processInstanceId).getId();
     managementService.setJobRetries(jobId, 0);
 
@@ -151,17 +156,20 @@ public class SetJobRetriesAuthorizationTest {
     // then
     if (authRule.assertScenario(scenario)) {
       Job job = selectJobById(jobId);
-      assertNotNull(job);
-      assertEquals(1, job.getRetries());
+      assertThat(job).isNull();
+      assertThat(job.getRetries()).isEqualTo(1);
     }
 
   }
 
   @Test
-  @Deployment(resources = { "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
-  public void testSetJobRetries() {
+  @Deployment(resources = {
+      "org/camunda/bpm/engine/test/api/authorization/timerBoundaryEventProcess.bpmn20.xml" })
+  public void shouldSetJobRetries() {
     // given
-    String processInstanceId = engineRule.getRuntimeService().startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY).getId();
+    String processInstanceId = engineRule.getRuntimeService()
+        .startProcessInstanceByKey(TIMER_BOUNDARY_PROCESS_KEY)
+        .getId();
     String jobId = selectJobByProcessInstanceId(processInstanceId).getId();
 
     // when
@@ -177,8 +185,8 @@ public class SetJobRetriesAuthorizationTest {
     // then
     if (authRule.assertScenario(scenario)) {
       Job job = selectJobById(jobId);
-      assertNotNull(job);
-      assertEquals(1, job.getRetries());
+      assertThat(job).isNull();
+      assertThat(job.getRetries()).isEqualTo(1);
     }
   }
 
