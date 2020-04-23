@@ -34,10 +34,13 @@ import org.camunda.bpm.engine.ManagementService;
 import org.camunda.bpm.engine.ProcessEngine;
 import org.camunda.bpm.engine.RepositoryService;
 import org.camunda.bpm.engine.exception.NotValidException;
+import org.camunda.bpm.engine.impl.application.ProcessApplicationManager;
 import org.camunda.bpm.engine.impl.cfg.ProcessEngineConfigurationImpl;
+import org.camunda.bpm.engine.impl.persistence.deploy.cache.DeploymentCache;
 import org.camunda.bpm.engine.repository.Deployment;
 import org.camunda.bpm.engine.repository.DeploymentHandlerFactory;
 import org.camunda.bpm.engine.repository.DeploymentQuery;
+import org.camunda.bpm.engine.repository.DeploymentWithDefinitions;
 import org.camunda.bpm.engine.repository.ProcessApplicationDeployment;
 import org.camunda.bpm.engine.repository.ProcessDefinition;
 import org.camunda.bpm.engine.repository.ProcessDefinitionQuery;
@@ -62,14 +65,14 @@ public class ProcessApplicationDeploymentTest {
 
   protected ProcessEngineRule engineRule = new ProvidedProcessEngineRule();
   protected ProcessEngineTestRule testRule = new ProcessEngineTestRule(engineRule);
-  
+
   @Rule
   public RuleChain ruleChain = RuleChain.outerRule(engineRule).around(testRule);
-  
+
   protected ProcessEngineConfigurationImpl processEngineConfiguration;
   protected RepositoryService repositoryService;
   protected ManagementService managementService;
-  
+
   private EmbeddedProcessApplication processApplication;
   protected DeploymentHandlerFactory defaultDeploymentHandlerFactory;
   protected DeploymentHandlerFactory customDeploymentHandlerFactory;
@@ -81,7 +84,7 @@ public class ProcessApplicationDeploymentTest {
     processEngineConfiguration = engineRule.getProcessEngineConfiguration();
     repositoryService = engineRule.getRepositoryService();
     managementService = engineRule.getManagementService();
-    
+
     defaultDeploymentHandlerFactory = processEngineConfiguration.getDeploymentHandlerFactory();
     customDeploymentHandlerFactory = new VersionedDeploymentHandlerFactory();
     processApplication = new EmbeddedProcessApplication();
@@ -1173,6 +1176,59 @@ public class ProcessApplicationDeploymentTest {
 
     // then the registration is removed
     assertNull(managementService.getProcessApplicationForDeployment(deployment.getId()));
+  }
+
+  @Test
+  public void testProcessApplicationRegistration() {
+    // given
+    ProcessApplicationManager processApplicationManager = processEngineConfiguration.getProcessApplicationManager();
+    Set<String> registeredDeployments = processEngineConfiguration.getRegisteredDeployments();
+    DeploymentCache deploymentCache = processEngineConfiguration.getDeploymentCache();
+
+    BpmnModelInstance process1 = Bpmn.createExecutableProcess("process").done();
+    BpmnModelInstance process2 = Bpmn.createExecutableProcess("process").startEvent().done();
+
+    DeploymentWithDefinitions deployment1 = repositoryService.createDeployment(processApplication.getReference())
+        .name("foo")
+        .addModelInstance("process.bpmn", process1)
+        .deployWithResult();
+
+    DeploymentWithDefinitions deployment2 = repositoryService.createDeployment(processApplication.getReference())
+        .name("foo")
+        .addModelInstance("process.bpmn", process2)
+        .resumePreviousVersions()
+        .enableDuplicateFiltering(true)
+        .deployWithResult();
+
+    ProcessDefinition latestProcessDefinition = deployment2.getDeployedProcessDefinitions().get(0);
+
+    // assume
+    assertNotNull(managementService.getProcessApplicationForDeployment(deployment1.getId()));
+    assertNotNull(managementService.getProcessApplicationForDeployment(deployment2.getId()));
+
+    // delete latest process definition
+    repositoryService.deleteProcessDefinition(latestProcessDefinition.getId());
+
+    // stop process engine by clearing the caches
+    processApplicationManager.clearRegistrations();
+    registeredDeployments.clear();
+    deploymentCache.discardProcessDefinitionCache();
+
+    // when
+    ProcessApplicationDeployment deployment3 = repositoryService.createDeployment(processApplication.getReference())
+        .addModelInstance("process.bpmn", process2)
+        .resumePreviousVersions()
+        .enableDuplicateFiltering(true)
+        .name("foo")
+        .deploy();
+
+    // then
+    assertNotNull(managementService.getProcessApplicationForDeployment(deployment1.getId()));
+    assertNotNull(managementService.getProcessApplicationForDeployment(deployment2.getId()));
+
+    processApplication.undeploy();
+    repositoryService.deleteDeployment(deployment1.getId(), true);
+    repositoryService.deleteDeployment(deployment2.getId(), true);
   }
 
   /**
